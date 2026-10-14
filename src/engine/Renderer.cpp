@@ -4,7 +4,7 @@
 #include <cmath>
 
 namespace {
-    // ===== Section A: shaders (same as Step 2) =====
+    // ===== Section A: shaders =====
     const char* VERTEX_SHADER_SRC = R"(
         #version 330 core
         layout (location = 0) in vec2 aPos;
@@ -44,7 +44,7 @@ namespace {
     GLint locDamage     = -1;
     GLint locGrayscale  = -1;
 
-    const int   MAX_VERTICES    = 1024;
+    const int   MAX_VERTICES    = 8192;
     const int   CIRCLE_SEGMENTS = 40;
     const float PI              = 3.14159265f;
 
@@ -210,6 +210,9 @@ void Renderer::beginFrame() {
         std::cerr << "Warning: pushTransform/popTransform not balanced last frame\n";
     }
     transformStack.assign(1, Transform{});
+    setDamage(0.0f);
+    setGrayscale(false);
+    outlineThickness = 0.0f;
 }
 
 // ===== Section F: effects =====
@@ -229,6 +232,32 @@ void Renderer::setOutline(float thickness, const Color& color) {
 // ===== Section G: shapes =====
 void Renderer::drawRect(float x, float y, float w, float h, const Color& color) {
     fillShape({ {x, y}, {x + w, y}, {x + w, y + h}, {x, y + h} }, color);
+}
+
+void Renderer::drawRoundedRect(float x, float y, float w, float h, float radius,
+                               const Color& color) {
+    // Never let the corners be bigger than half the box
+    radius = std::fmin(radius, std::fmin(w, h) / 2.0f);
+    const int CORNER_STEPS = 6;
+
+    // The 4 corner centers, going counter-clockwise from bottom-right
+    Vec2 centers[4] = {
+        { x + w - radius, y + radius     },
+        { x + w - radius, y + h - radius },
+        { x + radius,     y + h - radius },
+        { x + radius,     y + radius     }
+    };
+    float startAngles[4] = { -90.0f, 0.0f, 90.0f, 180.0f };
+
+    std::vector<Vec2> pts;
+    for (int c = 0; c < 4; c++) {
+        for (int i = 0; i <= CORNER_STEPS; i++) {
+            float angle = (startAngles[c] + 90.0f * i / CORNER_STEPS) * PI / 180.0f;
+            pts.push_back({ centers[c].x + radius * std::cos(angle),
+                            centers[c].y + radius * std::sin(angle) });
+        }
+    }
+    fillShape(pts, color);
 }
 
 void Renderer::drawCircle(float cx, float cy, float radius, const Color& color) {
@@ -262,6 +291,10 @@ void Renderer::drawPolygon(const std::vector<Vec2>& points, const Color& color) 
 void Renderer::drawLine(float x1, float y1, float x2, float y2,
                         float thickness, const Color& color) {
     lineQuad({x1, y1}, {x2, y2}, thickness, false, color);
+}
+
+void Renderer::drawTriangles(const std::vector<Vec2>& points, const Color& color) {
+    drawVertices(points, GL_TRIANGLES, color);
 }
 
 // ===== Section H: transforms =====

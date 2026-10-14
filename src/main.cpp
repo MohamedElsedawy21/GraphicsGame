@@ -1,13 +1,17 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <iostream>
-#include <cmath>
 #include "engine/Renderer.h"
+#include "engine/Input.h"
+#include "engine/Audio.h"
+#include "game/Game.h"
 
 const int WINDOW_WIDTH  = 1280;
 const int WINDOW_HEIGHT = 720;
+const double LOGIC_STEP = 1.0 / 60.0;   // game logic always runs at 60 updates per second
 
 int main() {
+    // ---- 1. Window and OpenGL (same as Step 1) ----
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW\n";
         return -1;
@@ -41,68 +45,51 @@ int main() {
     glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
     glViewport(0, 0, fbWidth, fbHeight);
 
+    // ---- 2. Engine parts ----
     if (!Renderer::init(WINDOW_WIDTH, WINDOW_HEIGHT)) {
         std::cerr << "Failed to initialize renderer\n";
         glfwTerminate();
         return -1;
     }
+    Input::init(window, WINDOW_WIDTH, WINDOW_HEIGHT);
+    Audio::init();   // if there is no sound device, the game still runs silently
 
-    Color road    {0.35f, 0.35f, 0.38f};
-    Color rust    {0.79f, 0.40f, 0.12f};
-    Color yellow  {0.95f, 0.78f, 0.15f};
-    Color dark    {0.15f, 0.15f, 0.17f};
-    Color gray    {0.70f, 0.70f, 0.72f};
-    Color white   {0.95f, 0.95f, 0.95f};
-    Color outline {0.10f, 0.10f, 0.10f};
+    Game game;
+    game.init();
 
-    while (!glfwWindowShouldClose(window)) {
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-            glfwSetWindowShouldClose(window, true);
+    // ---- 3. The game loop with a fixed 60 Hz logic step ----
+    double previousTime = glfwGetTime();
+    double accumulator  = 0.0;
 
-        float time = (float)glfwGetTime();
+    while (!glfwWindowShouldClose(window) && !game.wantsToQuit()) {
+        Input::newFrame();     // forget last frame's clicks and key presses...
+        glfwPollEvents();      // ...then collect this frame's
 
-        glClearColor(0.53f, 0.75f, 0.92f, 1.0f);
+        // How much real time passed since the last frame?
+        double now = glfwGetTime();
+        double frameTime = now - previousTime;
+        previousTime = now;
+        if (frameTime > 0.25) frameTime = 0.25;   // e.g. after dragging the window
+        accumulator += frameTime;
+
+        game.handleInput();
+
+        // Run as many 1/60 s logic steps as the real time allows
+        while (accumulator >= LOGIC_STEP) {
+            game.update((float)LOGIC_STEP);
+            accumulator -= LOGIC_STEP;
+        }
+
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         Renderer::beginFrame();
-
-        // ---- Test scene (temporary) ----
-        Renderer::drawRect(0, 0, 1280, 150, road);
-        Renderer::drawLine(0, 75, 1280, 75, 4, white);
-
-        Renderer::setOutline(2.0f, outline);
-
-        // Row of every shape
-        Renderer::drawCircle(120, 300, 40, rust);
-        Renderer::drawEllipse(260, 300, 50, 25, yellow);
-        Renderer::drawTriangle(360, 260, 460, 260, 410, 340, rust);
-        Renderer::drawTrapezoid(510, 260, 100, 60, 80, yellow);
-        Renderer::drawPolygon({ {660, 260}, {760, 260}, {790, 300},
-                                {730, 345}, {650, 305} }, rust);
-
-        // Spinning wheel: rotate around its center
-        Renderer::pushTransform();
-        Renderer::translate(920, 300);
-        Renderer::rotate(-time * 180.0f);
-        Renderer::drawCircle(0, 0, 40, dark);
-        Renderer::drawRect(-4, -34, 8, 68, gray);
-        Renderer::drawRect(-34, -4, 68, 8, gray);
-        Renderer::popTransform();
-
-        // Swinging arm: rotate around the shoulder
-        Renderer::pushTransform();
-        Renderer::translate(1100, 360);
-        Renderer::rotate(std::sin(time * 4.0f) * 45.0f);
-        Renderer::drawRect(-5, -60, 10, 60, rust);
-        Renderer::drawEllipse(0, -62, 14, 6, yellow);
-        Renderer::popTransform();
-        Renderer::drawCircle(1100, 360, 5, dark);
-
-        Renderer::setOutline(0.0f, outline);
+        game.draw();
 
         glfwSwapBuffers(window);
-        glfwPollEvents();
     }
 
+    // ---- 4. Clean up ----
+    Audio::shutdown();
     Renderer::shutdown();
     glfwTerminate();
     return 0;

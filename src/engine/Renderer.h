@@ -23,6 +23,7 @@ namespace Renderer {
 
     // ---- Filled shapes ----
     void drawRect(float x, float y, float w, float h, const Color& color);
+    void drawRoundedRect(float x, float y, float w, float h, float radius, const Color& color);
     void drawCircle(float cx, float cy, float radius, const Color& color);
     void drawEllipse(float cx, float cy, float rx, float ry, const Color& color);
     void drawTriangle(float x1, float y1, float x2, float y2,
@@ -34,6 +35,9 @@ namespace Renderer {
     // ---- Lines (never outlined) ----
     void drawLine(float x1, float y1, float x2, float y2,
                   float thickness, const Color& color);
+
+    // ---- Raw triangles: every 3 points = 1 triangle (never outlined) ----
+    void drawTriangles(const std::vector<Vec2>& points, const Color& color);
 
     // ---- Transforms ----
     void pushTransform();
