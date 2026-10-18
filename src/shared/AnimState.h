@@ -10,4 +10,5 @@ struct AnimState {
     bool  jumping = false;
     bool  ducking = false;
     float jumpOffset = 0.0f; // extra height while jumping, in pixels
+    bool  talking = false;   // mouth moves (cutscene dialogue)
 };

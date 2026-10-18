@@ -11,6 +11,22 @@ enum class Sfx {
     Click,       // a menu button or card is clicked
     Win,         // the player won
     Lose,        // the player lost
+
+    // ---- Cutscene voices: gibberish "babble" talking, like cartoon game characters ----
+    TalkHero,         // Am Sayed, normal
+    TalkHeroExcited,  // Am Sayed, surprised / annoyed
+    TalkHeroShout,    // Am Sayed, "This is war!"
+    TalkDriver,       // tuk-tuk / microbus drivers
+    TalkBig,          // the big bus driver (deep voice)
+
+    // ---- Vehicle noises ----
+    HornTuktuk,       // squeaky "beep beep"
+    HornCar,          // normal car "honk honk"
+    HornMicrobus,     // long musical horn
+    HornBus,          // huge deep air horn
+    CarZoom,          // a car speeding past
+    Screech,          // tires screeching to a stop
+
     Count        // not a sound: just the number of sounds above
 };
 
@@ -21,6 +37,7 @@ namespace Audio {
     void play(Sfx sound);
     void startMusic();
     void stopMusic();
+    void setMusicVolume(float amount);   // 1.0 = normal; lower it so voices are heard
 
     // Sound settings menu
     void  volumeUp();

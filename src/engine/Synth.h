@@ -15,6 +15,12 @@ namespace Synth {
     void addNote(Samples& out, float start, float duration,
                  float freqStart, float freqEnd, Wave wave, float volume);
 
+    // A note that KEEPS its volume (horns, voices) with a short fade in and out.
+    // vibrato = how much the pitch wobbles (0.02 = 2%), like a real voice.
+    void addSustained(Samples& out, float start, float duration,
+                      float freqStart, float freqEnd, Wave wave, float volume,
+                      float vibrato = 0.0f);
+
     // Frequency of a piano key. 69 = A4 = 440 Hz, +1 = one semitone higher.
     float noteFreq(int midiNote);
 

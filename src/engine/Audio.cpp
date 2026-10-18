@@ -46,6 +46,105 @@ namespace {
         return true;
     }
 
+    // ===== Section C2: gibberish voices =====
+    // Cartoon game characters often "talk" in fast nonsense syllables instead of words,
+    // while the real words appear as text. Each syllable here is:
+    //   a tiny noise burst (the consonant: "b", "t", "k"...)
+    //   + a short buzzy tone that slides in pitch (the vowel: "ah", "oo", "eh"...)
+    // The random pitch jumps give the funny, babbling voice.
+    struct VoiceStyle {
+        unsigned seed;       // different seed = different "sentence"
+        float basePitch;     // Hz: higher = smaller/younger voice, lower = bigger voice
+        float pitchRange;    // how many semitones the voice jumps around
+        int   syllables;
+        float syllableTime;  // seconds per syllable (smaller = faster talking)
+        float volume;
+    };
+
+    unsigned rngState = 1;
+    float random01() {
+        rngState = rngState * 1664525u + 1013904223u;
+        return (rngState >> 8) / 16777216.0f;   // 0 to 1
+    }
+
+    void makeBabble(Synth::Samples& s, const VoiceStyle& v) {
+        rngState = v.seed;
+        float t = 0.0f;
+        for (int i = 0; i < v.syllables; i++) {
+            float len = v.syllableTime * (0.7f + random01() * 0.6f);
+
+            // Pitch: random jump around the base, rising a bit at the end like a question
+            float semitones = (random01() * 2.0f - 0.6f) * v.pitchRange;
+            if (i == v.syllables - 1) semitones += 3.0f;
+            float pitch = v.basePitch * std::pow(2.0f, semitones / 12.0f);
+            float glide = pitch * (0.85f + random01() * 0.35f);
+
+            // Consonant: a very short burst of noise
+            Synth::addNote(s, t, 0.018f, 0, 0, Wave::Noise, v.volume * 0.8f);
+            // Vowel: buzzy base tone + brighter overtones ("formants")
+            Synth::addSustained(s, t + 0.012f, len, pitch, glide, Wave::Square,   v.volume * 0.45f, 0.03f);
+            Synth::addSustained(s, t + 0.012f, len, pitch * 2.0f, glide * 2.0f, Wave::Sine, v.volume * 0.55f, 0.03f);
+            Synth::addSustained(s, t + 0.012f, len, pitch * 3.0f, glide * 2.9f, Wave::Triangle, v.volume * 0.30f, 0.03f);
+
+            t += len + 0.025f;
+            if (random01() < 0.22f) t += 0.07f;   // little pauses between "words"
+        }
+    }
+
+    void makeVoices() {
+        //                        seed  pitch range syl  time   vol
+        makeBabble(effects[(int)Sfx::TalkHero].samples,        { 11, 210, 7,  12, 0.085f, 0.30f });
+        makeBabble(effects[(int)Sfx::TalkHeroExcited].samples, { 23, 260, 10,  8, 0.075f, 0.32f });
+        makeBabble(effects[(int)Sfx::TalkHeroShout].samples,   { 37, 230, 12, 10, 0.110f, 0.40f });
+        makeBabble(effects[(int)Sfx::TalkDriver].samples,      { 51, 150, 8,  13, 0.080f, 0.32f });
+        makeBabble(effects[(int)Sfx::TalkBig].samples,         { 77,  90, 6,  10, 0.130f, 0.40f });
+    }
+
+    // ===== Section C3: vehicle horns and noises =====
+    void makeVehicleNoises() {
+        // Tuk-tuk: squeaky little double beep
+        auto& tuk = effects[(int)Sfx::HornTuktuk].samples;
+        for (int i = 0; i < 2; i++) {
+            Synth::addSustained(tuk, i * 0.22f, 0.16f, 1250, 1250, Wave::Square, 0.18f);
+            Synth::addSustained(tuk, i * 0.22f, 0.16f, 1580, 1580, Wave::Square, 0.12f);
+        }
+
+        // Car: classic two-tone "honk honk" (two notes played together)
+        auto& car = effects[(int)Sfx::HornCar].samples;
+        for (int i = 0; i < 2; i++) {
+            Synth::addSustained(car, i * 0.32f, 0.24f, 400, 400, Wave::Square, 0.16f);
+            Synth::addSustained(car, i * 0.32f, 0.24f, 500, 500, Wave::Square, 0.14f);
+        }
+
+        // Microbus: a long honk, then a short musical tune horn (common on Cairo microbuses)
+        auto& micro = effects[(int)Sfx::HornMicrobus].samples;
+        Synth::addSustained(micro, 0.0f, 0.45f, 330, 330, Wave::Square, 0.15f);
+        Synth::addSustained(micro, 0.0f, 0.45f, 415, 415, Wave::Square, 0.13f);
+        const int tune[4] = { 76, 79, 76, 72 };
+        for (int i = 0; i < 4; i++) {
+            float f = Synth::noteFreq(tune[i]);
+            Synth::addSustained(micro, 0.55f + i * 0.13f, 0.11f, f, f, Wave::Square, 0.14f);
+        }
+
+        // Bus: huge, deep, slightly sliding air horn
+        auto& bus = effects[(int)Sfx::HornBus].samples;
+        Synth::addSustained(bus, 0.0f, 1.1f, 175, 168, Wave::Square,   0.20f);
+        Synth::addSustained(bus, 0.0f, 1.1f, 220, 212, Wave::Square,   0.17f);
+        Synth::addSustained(bus, 0.0f, 1.1f, 110, 106, Wave::Triangle, 0.30f);
+
+        // Car zooming past: engine tone that rises then falls (the "Doppler" effect) + road noise
+        auto& zoom = effects[(int)Sfx::CarZoom].samples;
+        Synth::addSustained(zoom, 0.0f, 0.45f, 140, 260, Wave::Square, 0.16f);
+        Synth::addSustained(zoom, 0.45f, 0.45f, 230, 110, Wave::Square, 0.16f);
+        Synth::addNote(zoom, 0.0f, 0.9f, 0, 0, Wave::Noise, 0.15f);
+
+        // Tire screech: a high whine that wavers
+        auto& screech = effects[(int)Sfx::Screech].samples;
+        Synth::addSustained(screech, 0.0f, 0.45f, 2100, 1700, Wave::Triangle, 0.12f, 0.04f);
+        Synth::addSustained(screech, 0.0f, 0.45f, 2900, 2500, Wave::Sine, 0.08f, 0.05f);
+        Synth::addNote(screech, 0.0f, 0.45f, 0, 0, Wave::Noise, 0.10f);
+    }
+
     // ===== Section C: design every sound effect =====
     void makeEffects() {
         auto& attack = effects[(int)Sfx::Attack].samples;      // "whoosh"
@@ -88,6 +187,9 @@ namespace {
                            Synth::noteFreq(loseNotes[i]) * (i == 3 ? 0.94f : 1.0f),
                            Wave::Triangle, 0.45f);
         }
+
+        makeVoices();
+        makeVehicleNoises();
     }
 
     // ===== Section D: background music (an Egyptian-style loop) =====
@@ -201,6 +303,10 @@ void Audio::startMusic() {
 
 void Audio::stopMusic() {
     if (ready) ma_sound_stop(&music.voices[0]);
+}
+
+void Audio::setMusicVolume(float amount) {
+    if (ready) ma_sound_set_volume(&music.voices[0], 0.6f * amount);
 }
 
 void Audio::volumeUp() {

@@ -35,6 +35,7 @@ void Game::changeState(GameState next) {
     frozen = (state != GameState::Playing);
 
     if (state == GameState::Cutscene) Cutscene::start();
+    Audio::setMusicVolume(state == GameState::Cutscene ? 0.3f : 1.0f);   // let voices be heard
     if (state == GameState::Won)  { Audio::play(Sfx::Win); }
     if (state == GameState::Lost) { Audio::stopMusic(); Audio::play(Sfx::Lose); }
     if (state == GameState::MainMenu || state == GameState::Playing) Audio::startMusic();

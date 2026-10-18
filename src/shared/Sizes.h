@@ -20,6 +20,7 @@ namespace Sizes {
     inline constexpr CharSize CAR           {150,  80, 130, 65 };   // Hard enemy
     inline constexpr CharSize TUKTUK        {110, 105,  90, 90 };   // Easy enemy
     inline constexpr CharSize MICROBUS      {170, 110, 150, 100};   // Medium enemy
+    inline constexpr CharSize BUS           {320, 150,   0,   0};   // cutscene only
 
     // ---- Health (from the project description) ----
     inline constexpr int MELEE_HP   = 5;

@@ -20,6 +20,9 @@ namespace Models {
     void drawMicrobus(float x, float y, float scale, const AnimState& anim);      // Medium
     void drawCar(float x, float y, float scale, const AnimState& anim);           // Hard
 
+    // Cutscene only
+    void drawBus(float x, float y, float scale, const AnimState& anim);
+
     // Projectiles: (x, y) = CENTER
     void drawStone(float x, float y, float time);
     void drawTire(float x, float y, float time);

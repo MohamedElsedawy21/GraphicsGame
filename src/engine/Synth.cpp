@@ -50,6 +50,36 @@ void Synth::addNote(Samples& out, float start, float duration,
     }
 }
 
+void Synth::addSustained(Samples& out, float start, float duration,
+                         float freqStart, float freqEnd, Wave wave, float volume,
+                         float vibrato) {
+    int first = (int)(start * SAMPLE_RATE);
+    int count = (int)(duration * SAMPLE_RATE);
+    if (count <= 0) return;
+    if ((int)out.size() < first + count) out.resize(first + count, 0.0f);
+
+    const float fadeIn  = 0.010f;
+    const float fadeOut = 0.030f;
+    float phase = 0.0f;
+
+    for (int i = 0; i < count; i++) {
+        float t = (float)i / SAMPLE_RATE;
+        float progress = (float)i / count;
+
+        // Flat volume, with a quick fade at both ends so there is no "click"
+        float envelope = 1.0f;
+        if (t < fadeIn) envelope = t / fadeIn;
+        if (duration - t < fadeOut) envelope *= (duration - t) / fadeOut;
+
+        float freq = freqStart + (freqEnd - freqStart) * progress;
+        freq *= 1.0f + vibrato * std::sin(2.0f * PI * 6.0f * t);   // 6 wobbles per second
+        phase += freq / SAMPLE_RATE;
+        phase -= std::floor(phase);
+
+        out[first + i] += waveSample(wave, phase) * envelope * volume;
+    }
+}
+
 float Synth::noteFreq(int midiNote) {
     return 440.0f * std::pow(2.0f, (midiNote - 69) / 12.0f);
 }

@@ -63,6 +63,12 @@ namespace Palette {
     inline constexpr Color GLASS        {0.35f, 0.50f, 0.60f, 0.85f};
     inline constexpr Color HEADLIGHT    {1.00f, 0.95f, 0.60f};
     inline constexpr Color WATERMELON   {0.25f, 0.55f, 0.25f};
+    inline constexpr Color CRATE        {0.66f, 0.48f, 0.28f};
+    inline constexpr Color SEAT         {0.55f, 0.22f, 0.25f};
+    inline constexpr Color BEARD        {0.32f, 0.29f, 0.27f};
+    inline constexpr Color BUS_BODY     {0.18f, 0.48f, 0.40f};  // cutscene bus: green
+    inline constexpr Color BUS_TOP      {0.93f, 0.91f, 0.84f};  // cream upper half
+    inline constexpr Color TREAD        {0.26f, 0.26f, 0.28f};
 
     // ---- Collectible: Egyptian pound coin (Person 1) ----
     inline constexpr Color COIN_GOLD    {0.90f, 0.72f, 0.25f};  // brass outer ring
