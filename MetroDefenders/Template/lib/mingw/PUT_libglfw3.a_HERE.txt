@@ -1,0 +1,1 @@
+Put libglfw3.a here ONLY if you build with MinGW g++ (from glfw-3.x.bin.WIN64.zip -> lib-mingw-w64).

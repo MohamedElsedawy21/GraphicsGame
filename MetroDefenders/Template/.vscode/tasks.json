@@ -1,0 +1,21 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build & Run (MSVC)",
+            "type": "shell",
+            "options": { "cwd": "${workspaceFolder}", "shell": { "executable": "cmd.exe", "args": ["/d", "/c"] } },
+            "command": "if not exist build mkdir build && cl /nologo /EHsc /std:c++17 /MD /O2 /Iinclude /IExternal\\include /I. main.cpp renderer.cpp models.cpp game.cpp menus.cpp cutscene.cpp audio.cpp src\\glad.c /Fo:build\\ /Fe:MetroDefenders.exe /link /LIBPATH:lib glfw3.lib opengl32.lib user32.lib gdi32.lib shell32.lib && MetroDefenders.exe",
+            "problemMatcher": ["$msCompile"],
+            "group": { "kind": "build", "isDefault": true }
+        },
+        {
+            "label": "Build & Run (MinGW g++)",
+            "type": "shell",
+            "options": { "cwd": "${workspaceFolder}", "shell": { "executable": "cmd.exe", "args": ["/d", "/c"] } },
+            "command": "g++ -std=c++17 -O2 -Iinclude -IExternal/include -I. main.cpp renderer.cpp models.cpp game.cpp menus.cpp cutscene.cpp audio.cpp -x c src/glad.c -x none -o MetroDefenders.exe -Llib/mingw -lglfw3 -lopengl32 -lgdi32 -luser32 -lshell32 -lole32 -static-libgcc -static-libstdc++ && MetroDefenders.exe",
+            "problemMatcher": ["$gcc"],
+            "group": "build"
+        }
+    ]
+}
