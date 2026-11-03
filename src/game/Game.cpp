@@ -100,13 +100,33 @@ void Game::handleInput() {
 }
 
 void Game::handleDebugKeys() {
-    if (Input::keyPressed(GLFW_KEY_F1)) world.coins.add(10);
-    if (Input::keyPressed(GLFW_KEY_F2)) changeState(GameState::Won);
-    if (Input::keyPressed(GLFW_KEY_F3)) changeState(GameState::Lost);
+    if (Input::keyPressed(GLFW_KEY_F1))
+        world.coins.add(10);
+
+    if (Input::keyPressed(GLFW_KEY_F2))
+        changeState(GameState::Won);
+
+    if (Input::keyPressed(GLFW_KEY_F3))
+        changeState(GameState::Lost);
+
+    // F4 = drop a coin
     if (Input::keyPressed(GLFW_KEY_F4)) {
         int lane = std::rand() % Layout::LANE_COUNT;
         float x = 300.0f + std::rand() % 900;
-        world.pickups.push_back({ x, Layout::laneGroundY(lane) + 20.0f, lane });
+        world.pickups.push_back({
+            x, Layout::laneGroundY(lane) + 20.0f, lane
+        });
+    }
+
+    // F5 = damage the first living enemy
+    if (Input::keyPressed(GLFW_KEY_F5)) {
+        for (auto& enemy : world.enemies) {
+            if (enemy->isAlive()) {
+                enemy->takeDamage(1);
+                Audio::play(Sfx::Hit);
+                break;
+            }
+        }
     }
 }
 
