@@ -5,6 +5,24 @@
 #include "engine/Audio.h"
 
 #include <cstdlib>
+#include <vector>
+#include <cmath>
+
+// ==================== Projectile Structures ====================
+
+struct WatermelonProjectile {
+    float x;
+    float startY;
+    float age;
+    int lane;
+};
+
+struct TireProjectile {
+    float x;
+    float y;
+    float age;
+    int lane;
+};
 
 // ==================== Tuk-tuk Enemy ====================
 
@@ -19,6 +37,22 @@ public:
         x -= 40.0f * dt;
     }
 
+    // Returns true whenever the Tuk-tuk throws a watermelon.
+    bool tryThrow(float dt, float& projectileX, float& projectileY) {
+        attackTimer += dt;
+
+        if (attackTimer >= 3.0f) {
+            attackTimer = 0.0f;
+
+            projectileX = x - 55.0f;
+            projectileY = drawY() + 65.0f;
+
+            return true;
+        }
+
+        return false;
+    }
+
     void draw() const override {
         Renderer::pushTransform();
         Renderer::translate(x, drawY());
@@ -31,6 +65,9 @@ public:
         Renderer::popTransform();
         drawHealth();
     }
+
+private:
+    float attackTimer = 0.0f;
 };
 
 // ==================== Microbus Enemy ====================
@@ -46,6 +83,22 @@ public:
         x -= 45.0f * dt;
     }
 
+    // Returns true whenever the Microbus launches a tire.
+    bool tryLaunchTire(float dt, float& tireX, float& tireY) {
+        attackTimer += dt;
+
+        if (attackTimer >= 3.5f) {
+            attackTimer = 0.0f;
+
+            tireX = x - 65.0f;
+            tireY = drawY() + 15.0f;
+
+            return true;
+        }
+
+        return false;
+    }
+
     void draw() const override {
         Renderer::pushTransform();
         Renderer::translate(x, drawY());
@@ -58,6 +111,9 @@ public:
         Renderer::popTransform();
         drawHealth();
     }
+
+private:
+    float attackTimer = 0.0f;
 };
 
 // ==================== Car Enemy ====================
@@ -92,8 +148,18 @@ public:
 namespace {
     const float SPAWN_DELAY = 2.5f;
 
+    const float WATERMELON_SPEED = 260.0f;
+    const float WATERMELON_LIFETIME = 1.2f;
+    const float WATERMELON_ARC_HEIGHT = 70.0f;
+
+    const float TIRE_SPEED = 300.0f;
+    const float TIRE_LIFETIME = 2.5f;
+
     int spawnedThisWave = 0;
     float spawnTimer = 0.0f;
+
+    std::vector<WatermelonProjectile> watermelons;
+    std::vector<TireProjectile> tires;
 
     // Enemy types:
     // 0 = Tuk-tuk
@@ -152,7 +218,7 @@ namespace {
 
         spawnedThisWave++;
 
-        // The last enemy of Wave 3 has appeared
+        // The last enemy of Wave 3 has appeared.
         if (world.currentWave == 3 &&
             spawnedThisWave == getWaveSize(3)) {
             world.allWavesSpawned = true;
@@ -165,7 +231,7 @@ namespace {
         spawnedThisWave = 0;
         spawnTimer = 0.0f;
 
-        // Spawn the first enemy immediately
+        // Spawn the first enemy immediately.
         spawnEnemy(world);
     }
 }
@@ -178,13 +244,18 @@ void EnemySystem::reset(World& world) {
     spawnedThisWave = 0;
     spawnTimer = 0.0f;
 
-    // Start Wave 1
+    // Clear all projectiles when restarting.
+    watermelons.clear();
+    tires.clear();
+
+    // Start Wave 1.
     startWave(world, 1);
 }
 
 void EnemySystem::update(World& world, float dt) {
 
-    // 1. Update enemies and check for defeated enemies
+    // 1. Update enemies and check for defeated enemies.
+
     for (auto& enemy : world.enemies) {
 
         if (enemy->removeMe) {
@@ -196,7 +267,7 @@ void EnemySystem::update(World& world, float dt) {
         if (!enemy->isAlive()) {
             Audio::play(Sfx::Death);
 
-            // Drop a coin where the enemy died
+            // Drop a coin where the enemy died.
             world.pickups.push_back({
                 enemy->x,
                 enemy->y + 20.0f,
@@ -204,10 +275,88 @@ void EnemySystem::update(World& world, float dt) {
             });
 
             enemy->removeMe = true;
+            continue;
+        }
+
+        // 2. Tuk-tuk watermelon attack.
+
+        TuktukEnemy* tuktuk =
+            dynamic_cast<TuktukEnemy*>(enemy.get());
+
+        if (tuktuk != nullptr) {
+            float projectileX;
+            float projectileY;
+
+            if (tuktuk->tryThrow(dt, projectileX, projectileY)) {
+
+                watermelons.push_back({
+                    projectileX,
+                    projectileY,
+                    0.0f,
+                    enemy->lane
+                });
+
+                Audio::play(Sfx::Attack);
+            }
+        }
+
+        // 3. Microbus tire attack.
+
+        MicrobusEnemy* microbus =
+            dynamic_cast<MicrobusEnemy*>(enemy.get());
+
+        if (microbus != nullptr) {
+            float tireX;
+            float tireY;
+
+            if (microbus->tryLaunchTire(dt, tireX, tireY)) {
+
+                tires.push_back({
+                    tireX,
+                    tireY,
+                    0.0f,
+                    enemy->lane
+                });
+
+                Audio::play(Sfx::Attack);
+            }
         }
     }
 
-    // 2. Spawn the remaining enemies in the current wave
+    // 4. Update watermelon projectiles.
+
+    for (WatermelonProjectile& watermelon : watermelons) {
+        watermelon.age += dt;
+        watermelon.x -= WATERMELON_SPEED * dt;
+    }
+
+    // Remove watermelons after their flight.
+    for (int i = static_cast<int>(watermelons.size()) - 1;
+         i >= 0; i--) {
+
+        if (watermelons[i].age >= WATERMELON_LIFETIME) {
+            watermelons.erase(watermelons.begin() + i);
+        }
+    }
+
+    // 5. Update rolling tire projectiles.
+
+    for (TireProjectile& tire : tires) {
+        tire.age += dt;
+        tire.x -= TIRE_SPEED * dt;
+    }
+
+    // Remove tires after their travel time.
+    for (int i = static_cast<int>(tires.size()) - 1;
+         i >= 0; i--) {
+
+        if (tires[i].age >= TIRE_LIFETIME) {
+            tires.erase(tires.begin() + i);
+        }
+    }
+
+    // 6. Spawn the remaining enemies in the current wave.
+
     int totalEnemies = getWaveSize(world.currentWave);
 
     if (spawnedThisWave < totalEnemies) {
@@ -219,7 +368,8 @@ void EnemySystem::update(World& world, float dt) {
         }
     }
 
-    // 3. Start the next wave only when all current enemies are defeated
+    // 7. Start the next wave only when all current enemies are defeated.
+
     if (spawnedThisWave == totalEnemies && world.enemies.empty()) {
 
         if (world.currentWave < 3) {
@@ -227,7 +377,8 @@ void EnemySystem::update(World& world, float dt) {
         }
     }
 
-    // 4. Check whether a player collects a coin
+    // 8. Check whether a player collects a coin.
+
     for (CoinPickup& pickup : world.pickups) {
 
         if (pickup.collected) {
@@ -259,5 +410,36 @@ void EnemySystem::update(World& world, float dt) {
     }
 }
 
+// ==================== Draw Effects ====================
+
 void EnemySystem::drawOverCharacters(const World& world) {
+
+    // Draw watermelon projectiles with an arc.
+
+    for (const WatermelonProjectile& watermelon : watermelons) {
+
+        float progress = watermelon.age / WATERMELON_LIFETIME;
+
+        float arc = WATERMELON_ARC_HEIGHT *
+                    std::sin(progress * 3.14159265f);
+
+        float projectileY = watermelon.startY + arc;
+
+        Models::drawWatermelon(
+            watermelon.x,
+            projectileY,
+            watermelon.age
+        );
+    }
+
+    // Draw rolling tires.
+
+    for (const TireProjectile& tire : tires) {
+
+        Models::drawTire(
+            tire.x,
+            tire.y,
+            tire.age
+        );
+    }
 }
