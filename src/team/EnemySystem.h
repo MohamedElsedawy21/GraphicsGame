@@ -1,13 +1,18 @@
+
 #pragma once
+
 #include "game/World.h"
 
-// =====================================================================
-//  OWNER: Person 3  -  enemies, waves, combat, coin drops.
-//  The Game calls these at the right moments; fill in the bodies.
-// =====================================================================
+// Enemy system: spawning, waves, combat and coin drops.
 namespace EnemySystem {
-    void reset(World& world);                     // new game: wave 1, empty timers
-    void update(World& world, float dt);          // 60 times a second: spawn, move, fight,
-                                                  //   drop coins, collect coins
-    void drawOverCharacters(const World& world);  // tires and thrown objects
+
+    // Reset enemy state and prepare wave 1.
+    void reset(World& world);
+
+    // Spawn enemies, update movement, attacks and collect coins.
+    void update(World& world, float dt);
+
+    // Draw projectiles and effects above characters.
+    void drawOverCharacters(const World& world);
+
 }

@@ -3,7 +3,7 @@
 #include "team/Models.h"
 #include "engine/Renderer.h"
 #include "engine/Audio.h"
-
+#include "team/PlayerSystem.h"
 #include <cstdlib>
 #include <vector>
 #include <cmath>
@@ -126,7 +126,28 @@ public:
 
     void update(float dt) override {
         anim.time += dt;
-        x -= 60.0f * dt;
+
+        if (!blocked) {
+            x -= 60.0f * dt;
+        }
+    }
+
+    // Stop the car when it reaches a player or barrier.
+    void setBlocked(bool value) {
+        blocked = value;
+        anim.moving = !blocked;
+    }
+
+    // Attack once every second.
+    bool tryAttack(float dt) {
+        attackTimer += dt;
+
+        if (attackTimer >= 1.0f) {
+            attackTimer = 0.0f;
+            return true;
+        }
+
+        return false;
     }
 
     void draw() const override {
@@ -141,8 +162,11 @@ public:
         Renderer::popTransform();
         drawHealth();
     }
-};
 
+private:
+    bool blocked = false;
+    float attackTimer = 1.0f;
+};
 // ==================== Wave Settings ====================
 
 namespace {
@@ -264,6 +288,62 @@ void EnemySystem::update(World& world, float dt) {
 
         enemy->update(dt);
 
+        // Car contact attack: defense barrier first, then player.
+CarEnemy* car = dynamic_cast<CarEnemy*>(enemy.get());
+
+if (car != nullptr) {
+
+    Rect carHitbox = enemy->hitbox();
+    bool touchingPlayer = false;
+
+    // Check whether the car has reached anyone in its lane.
+    for (const auto& player : world.players) {
+
+        if (!player->isAlive() ||
+            player->lane != enemy->lane) {
+            continue;
+        }
+
+        if (overlaps(carHitbox, player->hitbox())) {
+            touchingPlayer = true;
+            break;
+        }
+    }
+
+    car->setBlocked(touchingPlayer);
+
+    // Attack only when the cooldown is ready.
+    if (touchingPlayer && car->tryAttack(dt)) {
+
+        // First, try to damage a defense barrier.
+        bool blockedByDefense =
+            PlayerSystem::interceptEnemyProjectile(
+                world,
+                enemy->lane,
+                carHitbox,
+                Sizes::HARD_DAMAGE
+            );
+
+        // If no barrier intercepted the attack, damage a player.
+        if (!blockedByDefense) {
+
+            for (const auto& player : world.players) {
+
+                if (!player->isAlive() ||
+                    player->lane != enemy->lane) {
+                    continue;
+                }
+
+                if (overlaps(carHitbox, player->hitbox())) {
+                    player->takeDamage(Sizes::HARD_DAMAGE);
+                    Audio::play(Sfx::Hit);
+                    break;
+                }
+            }
+        }
+    }
+}
+
         if (!enemy->isAlive()) {
             Audio::play(Sfx::Death);
 
@@ -323,38 +403,121 @@ void EnemySystem::update(World& world, float dt) {
         }
     }
 
-    // 4. Update watermelon projectiles.
+// 4. Update watermelon projectiles and check collisions.
 
-    for (WatermelonProjectile& watermelon : watermelons) {
-        watermelon.age += dt;
-        watermelon.x -= WATERMELON_SPEED * dt;
+for (int i = static_cast<int>(watermelons.size()) - 1; i >= 0; i--) {
+
+    WatermelonProjectile& watermelon = watermelons[i];
+
+    watermelon.age += dt;
+    watermelon.x -= WATERMELON_SPEED * dt;
+
+    float progress = watermelon.age / WATERMELON_LIFETIME;
+
+    float arc = WATERMELON_ARC_HEIGHT *
+                std::sin(progress * 3.14159265f);
+
+    float projectileY = watermelon.startY + arc;
+
+    Rect watermelonHitbox = {
+        watermelon.x - 9.0f,
+        projectileY - 7.0f,
+        18.0f,
+        14.0f
+    };
+
+    bool projectileHit = false;
+
+    // Defense gets the first chance to intercept.
+    if (PlayerSystem::interceptEnemyProjectile(
+            world,
+            watermelon.lane,
+            watermelonHitbox,
+            Sizes::ENEMY_DAMAGE)) {
+
+        projectileHit = true;
     }
+    else {
 
-    // Remove watermelons after their flight.
-    for (int i = static_cast<int>(watermelons.size()) - 1;
-         i >= 0; i--) {
+        // If no defense intercepted it, check other players.
+        for (const auto& player : world.players) {
 
-        if (watermelons[i].age >= WATERMELON_LIFETIME) {
-            watermelons.erase(watermelons.begin() + i);
+            if (!player->isAlive() ||
+                player->lane != watermelon.lane) {
+                continue;
+            }
+
+            if (overlaps(player->hitbox(), watermelonHitbox)) {
+
+                player->takeDamage(Sizes::ENEMY_DAMAGE);
+                Audio::play(Sfx::Hit);
+
+                projectileHit = true;
+                break;
+            }
         }
     }
 
-    // 5. Update rolling tire projectiles.
+    // Remove the projectile if it hit something or expired.
+    if (projectileHit ||
+        watermelon.age >= WATERMELON_LIFETIME) {
 
-    for (TireProjectile& tire : tires) {
-        tire.age += dt;
-        tire.x -= TIRE_SPEED * dt;
+        watermelons.erase(watermelons.begin() + i);
+    }}
+// 5. Update rolling tire projectiles and check collisions.
+
+for (int i = static_cast<int>(tires.size()) - 1; i >= 0; i--) {
+
+    TireProjectile& tire = tires[i];
+
+    tire.age += dt;
+    tire.x -= TIRE_SPEED * dt;
+
+    // The tire is drawn using its center coordinates.
+    Rect tireHitbox = {
+        tire.x - 14.0f,
+        tire.y - 14.0f,
+        28.0f,
+        28.0f
+    };
+
+    bool projectileHit = false;
+
+    // Give defense players the first chance to intercept.
+    if (PlayerSystem::interceptEnemyProjectile(
+            world,
+            tire.lane,
+            tireHitbox,
+            Sizes::ENEMY_DAMAGE)) {
+
+        projectileHit = true;
     }
+    else {
 
-    // Remove tires after their travel time.
-    for (int i = static_cast<int>(tires.size()) - 1;
-         i >= 0; i--) {
+        // Check whether the tire hits another player.
+        for (const auto& player : world.players) {
 
-        if (tires[i].age >= TIRE_LIFETIME) {
-            tires.erase(tires.begin() + i);
+            if (!player->isAlive() ||
+                player->lane != tire.lane) {
+                continue;
+            }
+
+            if (overlaps(player->hitbox(), tireHitbox)) {
+
+                player->takeDamage(Sizes::ENEMY_DAMAGE);
+                Audio::play(Sfx::Hit);
+
+                projectileHit = true;
+                break;
+            }
         }
     }
 
+    // Remove the tire after a collision or expiration.
+    if (projectileHit || tire.age >= TIRE_LIFETIME) {
+        tires.erase(tires.begin() + i);
+    }
+}
     // 6. Spawn the remaining enemies in the current wave.
 
     int totalEnemies = getWaveSize(world.currentWave);
